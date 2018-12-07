@@ -1,0 +1,106 @@
+---
+title: "Reproducible Research first assign"
+author: "YanirFigovich"
+date: "4 בדצמבר 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## loading the data
+
+loading the data to R and libraries
+```{r load data}
+data<- read.csv("activity.csv")
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+library(gridExtra)
+```
+## ploting number of steps
+
+preparing and summarising the data in order to make the plot
+```{r make plot}
+data$date<-as_date(data$date)
+agg_data<- group_by(data,date)
+agg_data<- summarise(agg_data,steps_per_day=sum(steps))
+plot1<- ggplot(agg_data)+geom_histogram(aes(steps_per_day),fill="white",color="blue")
+plot1<-plot1+ labs(y="number of days")
+plot(plot1plot)
+```
+##find mean and median steps per day
+
+```{r mean and median steps}
+mean_steps_day<-mean(agg_data$steps_per_day,na.rm = T)
+mean_steps_day
+med_steps_day<- median(agg_data$steps_per_day,na.rm = T)
+med_steps_day
+```
+
+##plot average steps for each interval
+
+```{r plot average steps}
+agg_data<- group_by(data,interval)
+agg_data<- summarise(agg_data,avg_steps_per_interval=mean(steps,na.rm = T))
+plot2<-ggplot(agg_data)+geom_line(aes(interval,avg_steps_per_interval),lwd=1.1,color="blue")
+plot(plot2)
+```
+##find interval with max steps on average
+
+```{r find interval with max steps}
+filter(agg_data,avg_steps_per_interval==max(avg_steps_per_interval))
+```
+### imputing NA
+first we would like to know where and how much NA we have in the data.
+then we will impute the mean where ever we find na
+```{r imputing NA}
+#finding the NA
+sapply(data,function(x){sum(is.na(x))})
+##imputing avg steps where steps==NA
+#calculating the avg steps for each interval
+agg_data<- group_by(data,interval)
+agg_data<- summarise(agg_data,avg_steps_per_interval=mean(steps,na.rm = T))
+#mreging the base data with the avg steps
+merge_data<- left_join(data,agg_data,by="interval")
+#computing a new column to select the avg if steps=NA
+new_data<- mutate(merge_data,comp_steps=ifelse(is.na(steps),avg_steps_per_interval,steps))
+#see some of the new data
+head(new_data)
+```
+##plot average steps for each interval after adding avg steps insted of NA
+
+```{r plot steps per day}
+agg_by_day<- group_by(new_data,date)
+agg_by_day<-summarise(agg_by_day,comp_steps_day=sum(comp_steps))
+plot3<- ggplot(agg_by_day)+geom_histogram(aes(comp_steps_day),fill="white",color="blue")
+plot3<-plot3+labs(y="number of days")
+plot(plot3)
+```
+##plot average steps per interval comparing weekdays VS weekends
+we will first add anew column to our data with numeric representive of the day of the week.
+then we will separate  for 2 tables: one for week days and the other for weekends.
+then we will plot a histogram for each table
+```{r plot compering weekendsan weekdays}
+##adding the numeric weekday
+days_data<- mutate(data,week_day=wday(date))
+## a table for weekdays
+weekdays_data<- filter(days_data,week_day<6)
+##aggragating by interval mean
+agg_weekdays<- group_by(weekdays_data,interval)
+agg_weekdays<- summarise(agg_weekdays,avg_steps_per_interval=mean(steps,na.rm = T))
+## a table for weekends
+weekdEnds_data<- filter(days_data,week_day>5)
+##aggragating by interval mean
+agg_weekEnds<- group_by(weekdEnds_data,interval)
+agg_weekEnds<- summarise(agg_weekEnds,avg_steps_per_interval=mean(steps,na.rm = T))
+plot4<-ggplot(agg_weekdays)+geom_line(aes(interval,avg_steps_per_interval),lwd=1.1,color="blue")
+plot4<-plot4 + scale_y_continuous(limits=c(0, 220))
+plot5<-ggplot(agg_weekEnds)+geom_line(aes(interval,avg_steps_per_interval),lwd=1.1,color="blue")
+plot5<-plot5 + scale_y_continuous(limits=c(0, 220))
+pp<-grid.arrange(plot4,plot5,nrow=2)
+plot(pp)
+
+```
